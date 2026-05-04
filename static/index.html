@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Barcelona Architecture Classifier</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cream: #F5F0E8;
+      --stone: #C8BFB0;
+      --terracotta: #C1440E;
+      --terracotta-light: #E8603A;
+      --dark: #1A1612;
+      --mid: #5C5249;
+      --sand: #E8DFD0;
+      --white: #FDFAF6;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 2.5rem 3rem 2rem;
+      border-bottom: 1px solid var(--stone);
+      display: flex;
+      align-items: baseline;
+      gap: 1.5rem;
+    }
+
+    header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--dark);
+    }
+
+    header span {
+      font-size: 0.8rem;
+      color: var(--mid);
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      max-height: calc(100vh - 85px);
+    }
+
+    /* LEFT PANEL */
+    .upload-panel {
+      padding: 3rem;
+      border-right: 1px solid var(--stone);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .panel-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--mid);
+      font-weight: 500;
+    }
+
+    .drop-zone {
+      flex: 1;
+      border: 1.5px dashed var(--stone);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      overflow: hidden;
+      min-height: 320px;
+    }
+
+    .drop-zone:hover {
+      border-color: var(--terracotta);
+      background: rgba(193, 68, 14, 0.03);
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--terracotta);
+      background: rgba(193, 68, 14, 0.05);
+    }
+
+    .drop-zone.has-image {
+      border-style: solid;
+      border-color: var(--stone);
+    }
+
+    .drop-zone img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0; left: 0;
+      border-radius: 3px;
+    }
+
+    .drop-hint {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 1;
+    }
+
+    .drop-hint svg {
+      width: 36px;
+      height: 36px;
+      stroke: var(--stone);
+    }
+
+    .drop-hint p {
+      font-size: 0.85rem;
+      color: var(--mid);
+      font-weight: 300;
+    }
+
+    .drop-hint small {
+      font-size: 0.75rem;
+      color: var(--stone);
+    }
+
+    .image-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(26, 22, 18, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      border-radius: 3px;
+      z-index: 2;
+    }
+
+    .drop-zone.has-image:hover .image-overlay {
+      opacity: 1;
+    }
+
+    .image-overlay p {
+      color: #fff;
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    #file-input { display: none; }
+
+    .classify-btn {
+      background: var(--dark);
+      color: var(--white);
+      border: none;
+      padding: 0.9rem 2rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .classify-btn:hover:not(:disabled) {
+      background: var(--terracotta);
+    }
+
+    .classify-btn:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    .classify-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RIGHT PANEL */
+    .result-panel {
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      overflow-y: auto;
+    }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      opacity: 0.4;
+    }
+
+    .empty-state p {
+      font-size: 0.85rem;
+      color: var(--mid);
+      font-weight: 300;
+    }
+
+    /* RESULT CARDS */
+    .result-content { display: none; flex-direction: column; gap: 2rem; }
+    .result-content.visible { display: flex; animation: fadeUp 0.4s ease; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .prediction-card {
+      background: var(--dark);
+      color: var(--white);
+      border-radius: 4px;
+      padding: 1.5rem 1.75rem;
+    }
+
+    .prediction-card .pred-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--stone);
+      margin-bottom: 0.4rem;
+    }
+
+    .prediction-card .pred-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: var(--white);
+    }
+
+    .prediction-card.uncertain .pred-name {
+      color: #E8A87C;
+    }
+
+    .prediction-card .pred-conf {
+      font-size: 0.8rem;
+      color: var(--stone);
+      font-weight: 300;
+    }
+
+    .description-block {
+      border-left: 2px solid var(--terracotta);
+      padding-left: 1rem;
+    }
+
+    .description-block p {
+      font-size: 0.85rem;
+      line-height: 1.75;
+      color: var(--mid);
+      font-weight: 300;
+    }
+
+    .probs-section {}
+
+    .probs-section .panel-label {
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .prob-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .prob-row-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .prob-class {
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: var(--dark);
+      text-transform: capitalize;
+    }
+
+    .prob-class span {
+      color: var(--mid);
+      font-weight: 300;
+      font-size: 0.75rem;
+    }
+
+    .prob-val {
+      font-size: 0.78rem;
+      color: var(--mid);
+      font-weight: 300;
+    }
+
+    .prob-bar-track {
+      height: 3px;
+      background: var(--sand);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .prob-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--stone);
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .prob-bar-fill.top {
+      background: var(--terracotta);
+    }
+
+    .error-msg {
+      background: #fdf0ee;
+      border: 1px solid #f0c4bb;
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      font-size: 0.82rem;
+      color: #8B2500;
+      display: none;
+    }
+
+    @media (max-width: 700px) {
+      main { grid-template-columns: 1fr; max-height: none; }
+      .upload-panel { border-right: none; border-bottom: 1px solid var(--stone); }
+      header { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Barcelona Architecture Classifier</h1>
+  <span>ResNet-18 · Transfer Learning</span>
+</header>
+
+<main>
+  <!-- LEFT -->
+  <div class="upload-panel">
+    <span class="panel-label">Upload image</span>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-hint" id="drop-hint">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+        </svg>
+        <p>Drop a building photo here</p>
+        <small>or click to browse</small>
+      </div>
+      <img id="preview" src="" alt="" style="display:none;" />
+      <div class="image-overlay" id="image-overlay"><p>Change image</p></div>
+    </div>
+
+    <input type="file" id="file-input" accept="image/*" />
+
+    <div class="error-msg" id="error-msg"></div>
+
+    <button class="classify-btn" id="classify-btn" disabled>
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-label">Classify</span>
+    </button>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="result-panel">
+    <span class="panel-label">Result</span>
+
+    <div class="empty-state" id="empty-state">
+      <p>Upload an image to see the classification</p>
+    </div>
+
+    <div class="result-content" id="result-content">
+      <div class="prediction-card" id="prediction-card">
+        <p class="pred-label">Predicted style</p>
+        <p class="pred-name" id="pred-name">—</p>
+        <p class="pred-conf" id="pred-conf">—</p>
+      </div>
+
+      <div class="description-block" id="description-block">
+        <p id="description-text"></p>
+      </div>
+
+      <div class="probs-section">
+        <span class="panel-label">Class probabilities</span>
+        <div id="prob-bars"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const preview = document.getElementById('preview');
+  const dropHint = document.getElementById('drop-hint');
+  const imageOverlay = document.getElementById('image-overlay');
+  const classifyBtn = document.getElementById('classify-btn');
+  const spinner = document.getElementById('spinner');
+  const btnLabel = document.getElementById('btn-label');
+  const emptyState = document.getElementById('empty-state');
+  const resultContent = document.getElementById('result-content');
+  const predCard = document.getElementById('prediction-card');
+  const predName = document.getElementById('pred-name');
+  const predConf = document.getElementById('pred-conf');
+  const descriptionText = document.getElementById('description-text');
+  const probBars = document.getElementById('prob-bars');
+  const errorMsg = document.getElementById('error-msg');
+
+  const CLASS_LABELS = {
+    'eixample': "L'Eixample",
+    'gothic_quarter': 'Gothic Quarter',
+    'modernista': 'Modernista',
+    'olympic_modern': 'Olympic Modern'
+  };
+
+  let selectedFile = null;
+
+  function showPreview(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      dropHint.style.display = 'none';
+      imageOverlay.style.display = 'flex';
+      dropZone.classList.add('has-image');
+      classifyBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) {
+      selectedFile = e.target.files[0];
+      showPreview(selectedFile);
+      resetResult();
+    }
+  });
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      selectedFile = file;
+      showPreview(file);
+      resetResult();
+    }
+  });
+
+  function resetResult() {
+    resultContent.classList.remove('visible');
+    emptyState.style.display = 'flex';
+    errorMsg.style.display = 'none';
+  }
+
+  function setLoading(on) {
+    classifyBtn.disabled = on;
+    spinner.style.display = on ? 'block' : 'none';
+    btnLabel.textContent = on ? 'Classifying…' : 'Classify';
+  }
+
+  classifyBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    setLoading(true);
+    errorMsg.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await fetch('http://localhost:8000/predict', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      showResult(data);
+    } catch (err) {
+      errorMsg.textContent = 'Could not reach the API. Make sure the server is running on port 8000.';
+      errorMsg.style.display = 'block';
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  function showResult(data) {
+    emptyState.style.display = 'none';
+
+    const isUncertain = data.prediction === 'uncertain';
+    const displayName = isUncertain
+      ? 'Uncertain'
+      : (CLASS_LABELS[data.prediction] || data.prediction);
+
+    predCard.classList.toggle('uncertain', isUncertain);
+    predName.textContent = displayName;
+    predConf.textContent = isUncertain
+      ? `Closest match: ${CLASS_LABELS[data.top_class] || data.top_class} · ${(data.confidence * 100).toFixed(1)}% confidence (below threshold)`
+      : `${(data.confidence * 100).toFixed(1)}% confidence`;
+
+    descriptionText.textContent = data.description;
+
+    // probability bars
+    probBars.innerHTML = '';
+    const probs = data.all_probs;
+    const topClass = isUncertain ? data.top_class : data.prediction;
+
+    const sorted = Object.entries(probs).sort((a, b) => b[1] - a[1]);
+    sorted.forEach(([cls, val]) => {
+      const isTop = cls === topClass;
+      const label = CLASS_LABELS[cls] || cls;
+      const pct = (val * 100).toFixed(1);
+
+      const row = document.createElement('div');
+      row.className = 'prob-row';
+      row.innerHTML = `
+        <div class="prob-row-header">
+          <span class="prob-class">${label}</span>
+          <span class="prob-val">${pct}%</span>
+        </div>
+        <div class="prob-bar-track">
+          <div class="prob-bar-fill ${isTop ? 'top' : ''}" style="width: 0%"></div>
+        </div>
+      `;
+      probBars.appendChild(row);
+
+      // animate bar
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          row.querySelector('.prob-bar-fill').style.width = `${pct}%`;
+        });
+      });
+    });
+
+    resultContent.classList.remove('visible');
+    void resultContent.offsetWidth;
+    resultContent.classList.add('visible');
+  }
+</script>
+</body>
+</html>
